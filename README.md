@@ -8,4 +8,10 @@ Fork this repo, add your solution and documentation on how to compile and run yo
 
 Obviously, we are looking for a fresh solution, not based on others' code.
 
+A: Assuming your operating systems has Go sdk installed and $GOPATH environment variable properly set, the steps to run this solutions is pretty straighforward
+`$ go build main.go`
+`$ ./main relative/path/to/word.list`
+
+Happy searching!!!
+
 
