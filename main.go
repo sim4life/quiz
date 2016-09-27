@@ -16,20 +16,54 @@ func (s ByLength) Len() int           { return len(s) }
 func (s ByLength) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s ByLength) Less(i, j int) bool { return len(s[i]) < len(s[j]) }
 
+type StringSet struct {
+	set map[string]bool
+}
+
+func NewStringSet() *StringSet {
+	return &StringSet{make(map[string]bool)}
+}
+
+func (set *StringSet) Add(s string) bool {
+	_, found := set.set[s]
+	set.set[s] = true
+	return !found //False if it existed already
+}
+
+func (set *StringSet) Get(s string) bool {
+	_, found := set.set[s]
+	return found //true if it existed already
+}
+
+func (set *StringSet) Remove(s string) {
+	delete(set.set, s)
+}
+
+func (set *StringSet) isEmpty() bool {
+	for _, val := range set.set {
+		if val == true {
+			return false
+		}
+	}
+	return true
+}
+
 /**
  * The isStringConcat is a recursive function and it return true if
  * it finds all the components of the search_word in the sorted_words list.
  */
-func isStringConcat(sorted_words, lex_sort_words []string, search_word string, startIndices []int) bool {
-	total_words := len(sorted_words)
+func isStringConcat(sorted_words, lex_sort_words []string, search_word string, startIndices []int, foundSet *StringSet) bool {
+	total_words := len(lex_sort_words)
 	min_word_len := len(sorted_words[0])
 	//Collecting all the component words of the search_word
 	comp_words := make([]string, 0)
-	for j := startIndices[len(search_word)-min_word_len]; j >= 0; j-- {
+	for j := len(sorted_words) - 1; j >= 0; j-- {
 		//assuming no duplicates and starting search from the index of the word with
 		//length of the search_word minus min word length
 		if strings.Contains(search_word, sorted_words[j]) {
-			comp_words = append(comp_words, sorted_words[j])
+			if len(search_word) >= (len(sorted_words[j]) + min_word_len) {
+				comp_words = append(comp_words, sorted_words[j])
+			}
 		}
 	}
 	//Find full component words within the list
@@ -47,7 +81,14 @@ func isStringConcat(sorted_words, lex_sort_words []string, search_word string, s
 				} else { //find if the token itself is composed of component words
 					//if token length is == min word length then earlier binary search is enough
 					if len(tokens[0]) > min_word_len {
-						found = isStringConcat(sorted_words, lex_sort_words, tokens[0], startIndices)
+						if foundSet.Get(tokens[0]) {
+							found = true
+						} else {
+							found = isStringConcat(sorted_words[:startIndices[len(tokens[0])-min_word_len]+1], lex_sort_words, tokens[0], startIndices, foundSet)
+							if found {
+								foundSet.Add(tokens[0])
+							}
+						}
 					}
 				}
 			}
@@ -59,7 +100,14 @@ func isStringConcat(sorted_words, lex_sort_words []string, search_word string, s
 					found = true
 				} else {
 					if len(tokens[1]) > min_word_len {
-						found = isStringConcat(sorted_words, lex_sort_words, tokens[1], startIndices)
+						if foundSet.Get(tokens[1]) {
+							found = true
+						} else {
+							found = isStringConcat(sorted_words[:startIndices[len(tokens[1])-min_word_len]+1], lex_sort_words, tokens[1], startIndices, foundSet)
+							if found {
+								foundSet.Add(tokens[1])
+							}
+						}
 					}
 				}
 			}
@@ -84,6 +132,18 @@ func getLongestCompWord(words []string) (longest_comp_word string) {
 	found := false
 	total_words := len(words)
 
+	foundSet := NewStringSet()
+	/*
+	   for _, val := range A {
+	     set.Add(val)
+	   }
+	   for ind, value := range A {
+	     set.Remove(value)
+	     if set.isEmpty() {
+	       return ind
+	     }
+	   }
+	*/
 	//preparing words list in ascending order lexical-wise
 	lex_sort_words := make([]string, len(words))
 	copy(lex_sort_words, words)
@@ -107,10 +167,14 @@ func getLongestCompWord(words []string) (longest_comp_word string) {
 		}
 	}
 
+	fmt.Printf("[%s] Evaluating word[%d], sorted length-wise is: %s ...\n", time.Now().Format(time.Stamp), total_words-1, sorted_words[total_words-1])
+	//sending each word from the sorted word list length-wise for evaluation
+	//starting from the biggest word
 	for i := total_words - 1; i >= 0; i-- {
-		fmt.Printf("[%s] Evaluating word[%d], sorted length-wise is: %s ...\n", time.Now().Format(time.Stamp), i, sorted_words[i])
-		found = isStringConcat(sorted_words, lex_sort_words, sorted_words[i], startIndices)
+		//fmt.Printf("[%s] Evaluating word[%d], sorted length-wise is: %s ...\n", time.Now().Format(time.Stamp), i, sorted_words[i])
+		found = isStringConcat(sorted_words, lex_sort_words, sorted_words[i], startIndices, foundSet)
 		if found {
+			fmt.Printf("[%s] Evaluating & FOUND word[%d], sorted length-wise is: %s ...\n", time.Now().Format(time.Stamp), i, sorted_words[i])
 			longest_comp_word = sorted_words[i]
 			fmt.Println("found word is:", sorted_words[i])
 			return
@@ -141,9 +205,11 @@ func main() {
 	}
 
 	longest_comp_word := getLongestCompWord(lines)
-
-	fmt.Println("The longest compound word in the list is: ", longest_comp_word)
-
+	if longest_comp_word == "" {
+		fmt.Println("No compound word found in the list")
+	} else {
+		fmt.Println("The longest compound word in the list is: ", longest_comp_word)
+	}
 }
 
 /*
