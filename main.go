@@ -48,15 +48,20 @@ func (set *StringSet) isEmpty() bool {
 	return true
 }
 
-/**
- * The isStringConcat is a recursive function and it return true if
- * it finds all the components of the search_word in the sorted_words list.
+func isSearchableWord(word string, min_len int) bool {
+	return word != "" && len(word) >= min_len
+}
+
+func isPrefixFound(word string, found bool) bool {
+	return word == "" || (word != "" && found)
+}
+
+/*
+ * The getCompoundingWords collects all the component words of the search_word
  */
-func isStringConcat(sorted_words, lex_sort_words []string, search_word string, startIndices []int, foundSet *StringSet) bool {
-	total_words := len(lex_sort_words)
-	min_word_len := len(sorted_words[0])
-	//Collecting all the component words of the search_word
+func getCompoundingWords(sorted_words []string, search_word string) ([]string, int) {
 	comp_words := make([]string, 0)
+	min_word_len := len(sorted_words[0])
 	for j := len(sorted_words) - 1; j >= 0; j-- {
 		//assuming no duplicates and starting search from the index of the word with
 		//length of the search_word minus min word length
@@ -66,50 +71,65 @@ func isStringConcat(sorted_words, lex_sort_words []string, search_word string, s
 			}
 		}
 	}
-	//Find full component words within the list
-	for _, c_word := range comp_words {
-		found := false
-		pos := total_words
+	return comp_words, min_word_len
+}
 
-		tokens := strings.Split(search_word, c_word)
-		if tokens[0] != "" && len(tokens[0]) >= min_word_len { //else c_word is a prefix
-			if tokens[1] == "" || len(tokens[1]) >= min_word_len {
-				//Binary search token in ascending order lexical-wise words list
-				pos = sort.SearchStrings(lex_sort_words, tokens[0])
-				if pos < total_words && tokens[0] == lex_sort_words[pos] {
-					found = true
-				} else { //find if the token itself is composed of component words
-					//if token length is == min word length then earlier binary search is enough
-					if len(tokens[0]) > min_word_len {
-						if foundSet.Get(tokens[0]) {
-							found = true
-						} else {
-							found = isStringConcat(sorted_words[:startIndices[len(tokens[0])-min_word_len]+1], lex_sort_words, tokens[0], startIndices, foundSet)
-							if found {
-								foundSet.Add(tokens[0])
-							}
-						}
-					}
+/*
+ * The searchSubWord attempts to match search_word in the lex_sort_words list.
+ * If it can't search it then it search for prefix, middle words and suffix of search_word
+ */
+func searchSubWord(sorted_words, lex_sort_words []string, search_word string,
+	startIndices []int, foundSet *StringSet, total_words, min_word_len int, found bool) bool {
+	pos := sort.SearchStrings(lex_sort_words, search_word)
+	if pos < total_words && search_word == lex_sort_words[pos] {
+		found = true
+	} else {
+		if len(search_word) > min_word_len {
+			if foundSet.Get(search_word) {
+				found = true
+			} else {
+				found = isStringConcat(sorted_words[:startIndices[len(search_word)-min_word_len]+1],
+					lex_sort_words, search_word, startIndices, foundSet)
+				if found {
+					foundSet.Add(search_word)
 				}
 			}
 		}
-		if tokens[1] != "" && len(tokens[1]) >= min_word_len { //c_word is NOT a suffix and/or it's a middle word
-			if tokens[0] == "" || (tokens[0] != "" && found) {
-				pos = sort.SearchStrings(lex_sort_words, tokens[1])
-				if pos < total_words && tokens[1] == lex_sort_words[pos] {
-					found = true
-				} else {
-					if len(tokens[1]) > min_word_len {
-						if foundSet.Get(tokens[1]) {
-							found = true
-						} else {
-							found = isStringConcat(sorted_words[:startIndices[len(tokens[1])-min_word_len]+1], lex_sort_words, tokens[1], startIndices, foundSet)
-							if found {
-								foundSet.Add(tokens[1])
-							}
-						}
-					}
-				}
+	}
+
+	return found
+}
+
+/**
+ * The isStringConcat is a recursive function and it return true if
+ * it finds all the components of the search_word in the sorted_words list.
+ */
+func isStringConcat(sorted_words, lex_sort_words []string, search_word string,
+	startIndices []int, foundSet *StringSet) bool {
+	total_words := len(lex_sort_words)
+
+	comp_words, min_word_len := getCompoundingWords(sorted_words, search_word)
+
+	//Find full component words within the list
+	for _, c_word := range comp_words {
+		found := false
+
+		tokens := strings.Split(search_word, c_word)
+		// if prefix is NOT a searchable word then c_word is a prefix
+		if isSearchableWord(tokens[0], min_word_len) {
+			// if non-Prefix is a searchable word then we need to run search on Prefix
+			if isSearchableWord(tokens[1], min_word_len) {
+				found = searchSubWord(sorted_words, lex_sort_words, tokens[0], startIndices,
+					foundSet, total_words, min_word_len, found)
+			}
+		}
+		/* if non-Prefix is NOT searchable word then c_word is NOT a suffix
+		and/or it's a middle word */
+		if isSearchableWord(tokens[1], min_word_len) {
+			// run a search on non-Prefix word only if prefix is found
+			if isPrefixFound(tokens[0], found) {
+				found = searchSubWord(sorted_words, lex_sort_words, tokens[1], startIndices,
+					foundSet, total_words, min_word_len, found)
 			}
 		}
 		if found {
@@ -133,17 +153,7 @@ func getLongestCompWord(words []string) (longest_comp_word string) {
 	total_words := len(words)
 
 	foundSet := NewStringSet()
-	/*
-	   for _, val := range A {
-	     set.Add(val)
-	   }
-	   for ind, value := range A {
-	     set.Remove(value)
-	     if set.isEmpty() {
-	       return ind
-	     }
-	   }
-	*/
+
 	//preparing words list in ascending order lexical-wise
 	lex_sort_words := make([]string, len(words))
 	copy(lex_sort_words, words)
@@ -167,14 +177,16 @@ func getLongestCompWord(words []string) (longest_comp_word string) {
 		}
 	}
 
-	fmt.Printf("[%s] Evaluating word[%d], sorted length-wise is: %s ...\n", time.Now().Format(time.Stamp), total_words-1, sorted_words[total_words-1])
+	fmt.Printf("[%s] Evaluating word[%d], sorted length-wise is: %s ...\n",
+		time.Now().Format(time.Stamp), total_words-1, sorted_words[total_words-1])
 	//sending each word from the sorted word list length-wise for evaluation
 	//starting from the biggest word
 	for i := total_words - 1; i >= 0; i-- {
 		//fmt.Printf("[%s] Evaluating word[%d], sorted length-wise is: %s ...\n", time.Now().Format(time.Stamp), i, sorted_words[i])
 		found = isStringConcat(sorted_words, lex_sort_words, sorted_words[i], startIndices, foundSet)
 		if found {
-			fmt.Printf("[%s] Evaluating & FOUND word[%d], sorted length-wise is: %s ...\n", time.Now().Format(time.Stamp), i, sorted_words[i])
+			fmt.Printf("[%s] Evaluating & FOUND word[%d], sorted length-wise is: %s ...\n",
+				time.Now().Format(time.Stamp), i, sorted_words[i])
 			longest_comp_word = sorted_words[i]
 			fmt.Println("found word is:", sorted_words[i])
 			return
