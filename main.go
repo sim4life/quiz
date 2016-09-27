@@ -76,7 +76,8 @@ func getCompoundingWords(sorted_words []string, search_word string) ([]string, i
 
 /*
  * The searchSubWord attempts to match search_word in the lex_sort_words list.
- * If it can't search it then it search for prefix, middle words and suffix of search_word
+ * If it can't search it then it searches for prefix, middle words and suffix
+ * of search_word by calling function isStringConcat
  */
 func searchSubWord(sorted_words, lex_sort_words []string, search_word string,
 	startIndices []int, foundSet *StringSet, total_words, min_word_len int, found bool) bool {
